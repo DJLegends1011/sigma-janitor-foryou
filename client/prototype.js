@@ -130,7 +130,6 @@ export function mountPrototype(el, ctx) {
     // D: vertical swipe feed. One full-height slide per character, snap scrolling, actions on a right rail.
     const slide = (c, i) => `
         <section class="jfyD-slide" data-i="${i}" aria-label="${esc(c.name)}">
-            <div class="jfyD-backdrop" style="background-image:url('${esc(sized(c.avatar, 200))}')"></div>
             <div class="jfyD-stage">
                 <img class="jfyD-portrait" src="${esc(sized(c.avatar, 900))}" alt="" referrerpolicy="no-referrer" loading="${i < 3 ? 'eager' : 'lazy'}" decoding="async"
                     onload="this.parentElement.classList.add('loaded')" onerror="this.parentElement.classList.add('loaded','failed')">
@@ -154,7 +153,10 @@ export function mountPrototype(el, ctx) {
             ${c.nsfw ? '<span class="jfyD-nsfw">NSFW</span>' : ''}
         </section>`;
     const endHtml = () => hasMore ? '<i class="fa-solid fa-spinner fa-spin"></i>' : 'You are all caught up.';
-    const variantD = () => `<div class="jfyD" tabindex="0">${cards.map(slide).join('')}<div class="jfyD-end">${endHtml()}</div></div>`;
+    // one shared backdrop behind the whole feed (two layers), cross-faded by scroll position, like TikTok:
+    // per-slide backdrops always meet at a seam because each slide clips its own
+    const variantD = () => `<div class="jfyD-wrap"><div class="jfyD-bg" aria-hidden="true"><div class="jfyD-bg-layer"></div><div class="jfyD-bg-layer"></div></div>
+        <div class="jfyD" tabindex="0">${cards.map(slide).join('')}<div class="jfyD-end">${endHtml()}</div></div></div>`;
 
     function wireD() {
         const feedEl = root.querySelector('.jfyD');
@@ -169,6 +171,23 @@ export function mountPrototype(el, ctx) {
             window.addEventListener('resize', fit);
             cleanups.push(() => window.removeEventListener('resize', fit));
         }
+        // backdrop: layer 0 shows the slide at floor(position), layer 1 the next one, faded in by the fraction
+        const layers = root.querySelectorAll('.jfyD-bg-layer');
+        const bgOf = (i) => cards[i]?.avatar ? `url("${sized(cards[i].avatar, 200).replace(/"/g, '%22')}")` : 'none';
+        let shownA = -1, shownB = -1, raf = 0;
+        const paintBg = () => {
+            raf = 0;
+            const h = feedEl.clientHeight || 1;
+            const pos = Math.max(0, feedEl.scrollTop / h);
+            const a = Math.min(Math.floor(pos), cards.length - 1);
+            const frac = Math.min(1, pos - a);
+            if (a !== shownA) { layers[0].style.backgroundImage = bgOf(a); shownA = a; }
+            if (a + 1 !== shownB) { layers[1].style.backgroundImage = bgOf(a + 1); shownB = a + 1; }
+            layers[1].style.opacity = String(frac);
+        };
+        const onScroll = () => { if (!raf) raf = requestAnimationFrame(paintBg); };
+        feedEl.addEventListener('scroll', onScroll, { passive: true });
+        cleanups.push(() => { feedEl.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); });
         observer = new IntersectionObserver((entries) => {
             for (const en of entries) {
                 if (!en.isIntersecting) continue;
@@ -183,6 +202,7 @@ export function mountPrototype(el, ctx) {
         feedEl.querySelectorAll('.jfyD-slide').forEach(s => observer.observe(s));
         const at = feedEl.querySelector(`.jfyD-slide[data-i="${selected}"]`);
         if (at) feedEl.scrollTop = at.offsetTop;
+        paintBg();
         feedEl.focus({ preventScroll: true });
     }
 

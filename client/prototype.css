@@ -5,7 +5,8 @@
 .jfy-proto-source { font-size: .75rem; opacity: .6; margin-bottom: 8px; letter-spacing: .04em; }
 .jfy-proto.is-d .jfy-proto-source { position: absolute; z-index: 5; margin: 8px 12px; pointer-events: none; }
 /* full bleed: the feed covers the view's own padding, so the app background never shows around it */
-.jfy-proto.jfy-fill .jfyD { position: absolute; inset: 0; height: auto !important; z-index: 1; }
+.jfy-proto.jfy-fill .jfyD-wrap { position: absolute; inset: 0; z-index: 1; }
+.jfy-proto.jfy-fill .jfyD { height: 100% !important; }
 .jfy-proto.jfy-fill .jfy-proto-source { z-index: 6; }
 .jfy-proto-switch { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 9999; display: flex; align-items: center; gap: 10px;
     padding: 6px 10px; border-radius: 999px; background: #ff0; color: #000; font: 600 13px/1 system-ui, sans-serif; box-shadow: 0 4px 18px rgba(0,0,0,.45); }
@@ -27,10 +28,17 @@
 .jfyB-note { opacity: .6; font-size: .85rem; margin-top: 10px; }
 
 /* D: swipe feed. Sigma tokens only (bg, text, accent, radii, motion); neutral scrims, no tinted gradients. */
+.jfyD-wrap { position: relative; overflow: hidden; background: var(--bg-primary, #121212); }
+.jfyD-bg { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.jfyD-bg-layer {
+    position: absolute; inset: -60px;
+    background-size: cover; background-position: center 20%;
+    filter: blur(40px) saturate(1.1) brightness(.45);
+}
+.jfyD-bg-layer + .jfyD-bg-layer { opacity: 0; }
 .jfyD {
-    position: relative; overflow-y: auto; overscroll-behavior: contain;
+    position: relative; z-index: 1; overflow-y: auto; overscroll-behavior: contain;
     scroll-snap-type: y mandatory; scrollbar-width: none; outline: none;
-    background: var(--bg-primary, #121212);
 }
 .jfyD::-webkit-scrollbar { display: none; }
 .jfyD-slide {
@@ -38,14 +46,6 @@
     padding-block: 12px; /* the stages of two slides never meet edge to edge */
     display: grid; grid-template-columns: minmax(0, 1fr) min(560px, 100%) 76px minmax(0, 1fr);
     overflow: clip; isolation: isolate; /* clip, not hidden: hidden would make the slide a scroll container and break view() */
-}
-.jfyD-backdrop {
-    position: absolute; inset: -40px; z-index: -2;
-    background-size: cover; background-position: center 20%;
-    filter: blur(36px) saturate(1.1) brightness(.45); transform: scale(1.05);
-    /* feathered top/bottom: two slides' backdrops fade into each other instead of meeting at a hard line */
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);
-            mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);
 }
 .jfyD-stage {
     grid-column: 2; grid-row: 1; position: relative; overflow: hidden; z-index: 0;
@@ -163,16 +163,11 @@
         animation-timeline: view(block);
         animation-range: cover 0% cover 100%;
     }
-    .jfyD-backdrop { animation: jfy-backdrop-pass linear both; animation-timeline: view(block); animation-range: cover 0% cover 100%; }
 }
 @keyframes jfy-slide-pass {
     0%   { transform: scale(.9);  opacity: .35; }
     40%, 60% { transform: none;   opacity: 1; }
     100% { transform: scale(.9);  opacity: .35; }
-}
-@keyframes jfy-backdrop-pass {
-    0%, 100% { opacity: .4; }
-    40%, 60% { opacity: 1; }
 }
 @media (max-width: 720px) {
     .jfyD-slide { padding-block: 0; }
@@ -183,5 +178,5 @@
     }
 }
 @media (prefers-reduced-motion: reduce) {
-    .jfyD-stage, .jfyD-info, .jfyD-rail, .jfyD-backdrop { animation: none; }
+    .jfyD-stage, .jfyD-info, .jfyD-rail { animation: none; }
 }

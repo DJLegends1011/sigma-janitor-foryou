@@ -34,7 +34,15 @@ export function createApi(ctx) {
         }
         if (r.status === 404) throw new FeedError('JanitorAI has no For you feed for this account.', 'NOT_FOUND', 404);
         if (r.status === 429) throw new FeedError(`JanitorAI is rate limiting requests.${r.retryAfter ? ` Retry after ${r.retryAfter}.` : ''}`, 'RATE_LIMITED', 429);
-        if (r.status < 200 || r.status >= 300) throw new FeedError(`JanitorAI answered ${r.status || 'nothing'}`, 'HTTP', r.status);
+        if (r.status < 200 || r.status >= 300) {
+            // say who answered: a JSON {message} is Janitor's API, an HTML page is something in front of it
+            const raw = String(r.body || '');
+            let detail = '';
+            try { const m = JSON.parse(raw)?.message; detail = Array.isArray(m) ? m.join('; ') : String(m || ''); }
+            catch { detail = /<title>([^<]{0,80})/i.exec(raw)?.[1] || raw.replace(/\s+/g, ' ').slice(0, 120); }
+            ctx.log?.('recsys', method, path.split('?')[0], r.status, raw.slice(0, 300));
+            throw new FeedError(`JanitorAI answered ${r.status || 'nothing'}${detail ? `: ${detail}` : ''}`, 'HTTP', r.status);
+        }
         if (!r.body) return null;
         try { return JSON.parse(r.body); } catch { throw new FeedError('JanitorAI answered something that is not JSON', 'BAD_BODY', r.status); }
     }

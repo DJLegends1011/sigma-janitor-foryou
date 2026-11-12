@@ -139,6 +139,18 @@ test('feed: NSFW cards are skipped client-side', async () => {
     assert.deepEqual(out.map(c => c.id), [id(1), id(3), id(5)]);
 });
 
+test('feed: an all-NSFW feed with NSFW off reports what it hid (not "nothing left") and stops after 3 slates', async () => {
+    const api = fakeApi({ pages: 10, perPage: 20, nsfwEvery: 1 });
+    const feed = createFeed(api, { sleep: async () => {} });
+    assert.equal(await feed.start(), null);
+    const p = feed.position();
+    assert.equal(p.hidden.nsfw, 60, 'three slates of 20, all hidden for NSFW');
+    assert.equal(p.scanned, 60);
+    assert.equal(api.calls.home, 3, 'gives up after 3 slates instead of paging forever');
+    const shown = createFeed(fakeApi({ pages: 1, perPage: 3, nsfwEvery: 1 }), { filters: () => ({ showNsfw: true }), sleep: async () => {} });
+    assert.ok(await shown.start(), 'with NSFW on the same feed shows cards');
+});
+
 test('feed: waits for personalization on a brand-new account', async () => {
     const api = fakeApi({ pending: 1 });
     const feed = createFeed(api, { sleep: async () => {} });

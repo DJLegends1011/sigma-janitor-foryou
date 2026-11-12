@@ -40,14 +40,29 @@ export function mountView(el, ctx) {
         sendSignals: () => ctx.settings.get('sendSignals') === true,
     });
 
-    function message(text, kind = 'info') {
-        root.innerHTML = `<div class="jfy-message jfy-${kind}"><p>${esc(text)}</p>
-            <button type="button" class="glass-btn" data-act="retry"><i class="fa-solid fa-rotate"></i> Try again</button></div>`;
+    function message(text, kind = 'info', extra = '') {
+        root.innerHTML = `<div class="jfy-message jfy-${kind}"><p>${esc(text)}</p><div class="jfy-message-actions">${extra}
+            <button type="button" class="glass-btn" data-act="retry"><i class="fa-solid fa-rotate"></i> Try again</button></div></div>`;
+    }
+
+    // nothing passed the filters: say what was hidden and why, instead of "nothing left"
+    function emptyState() {
+        const { hidden = {}, scanned = 0 } = feed?.position() || {};
+        const hiddenTotal = (hidden.nsfw || 0) + (hidden.small || 0);
+        if (!scanned || !hiddenTotal) return message('Nothing left in your feed right now.');
+        const parts = [];
+        if (hidden.nsfw) parts.push(`${hidden.nsfw} NSFW (Show NSFW is off)`);
+        if (hidden.small) parts.push(`${hidden.small} under ${Number(ctx.settings.get('minTokens')) || 0} tokens`);
+        const buttons = [
+            hidden.nsfw ? '<button type="button" class="glass-btn" data-act="show-nsfw"><i class="fa-solid fa-eye"></i> Show NSFW</button>' : '',
+            hidden.small ? '<button type="button" class="glass-btn" data-act="no-min"><i class="fa-solid fa-filter-circle-xmark"></i> Show small bots</button>' : '',
+        ].join('');
+        message(`Your filters hid all ${scanned} recommendations so far: ${parts.join(', ')}.`, 'info', buttons);
     }
 
     async function render(card) {
         if (disposed) return;
-        if (!card) { message('Nothing left in your feed right now.'); return; }
+        if (!card) { emptyState(); return; }
         const pos = feed.position();
         const cfg = await loadPurifyConfig();
         const html = macros(card.descriptionHtml, card);
@@ -95,6 +110,8 @@ export function mountView(el, ctx) {
         else if (act === 'nope') run(() => feed.notInterested());
         else if (act === 'open') feed.markEngaged();
         else if (act === 'retry') { api.resetStatus(); start(); }
+        else if (act === 'show-nsfw') { ctx.settings.set('showNsfw', true); start(); }
+        else if (act === 'no-min') { ctx.settings.set('minTokens', 0); start(); }
     });
 
     function start() {

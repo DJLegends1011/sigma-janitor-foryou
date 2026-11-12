@@ -4,6 +4,7 @@ import { parseSlate, normalizeCard, passesFilters, makeEvent, cardEventPayloads,
 
 const PERSONALIZATION_POLLS = 4;
 const POLL_MS = 1000;
+const MAX_SLATES_PER_FILL = 3; // look through up to 60 recommendations for one that passes the filters
 
 export function createFeed(api, { filters = () => ({}), sendSignals = () => false, now = () => Date.now(), sleep = (ms) => new Promise(r => setTimeout(r, ms)) } = {}) {
     const seen = new Set();
@@ -15,6 +16,8 @@ export function createFeed(api, { filters = () => ({}), sendSignals = () => fals
     let session = null;
     let queue = [];
     let personalizing = false;
+    let slatesLoaded = 0;
+    const hidden = { nsfw: 0, small: 0 }; // why cards were filtered out, for an honest empty state
 
     const visible = () => entries.filter(e => e.card && !e.filtered);
 
@@ -48,6 +51,7 @@ export function createFeed(api, { filters = () => ({}), sendSignals = () => fals
             personalizing = false;
         }
         const slate = parseSlate(json, seen);
+        slatesLoaded += 1;
         cursor = slate.cursor;
         hasMore = !!slate.cursor && slate.items.length > 0;
         for (const entry of slate.items) entries.push({ entry, slate, card: null, filtered: false, hydrated: false });
@@ -64,17 +68,23 @@ export function createFeed(api, { filters = () => ({}), sendSignals = () => fals
             e.hydrated = true;
             e.card = normalizeCard(byId.get(e.entry.id));
             e.filtered = !passesFilters(e.card, f);
+            if (e.filtered && e.card) {
+                if (e.card.nsfw && f.showNsfw !== true) hidden.nsfw += 1;
+                else hidden.small += 1;
+            }
         }
         return todo.length;
     }
 
     /** Ensure at least `ahead` visible cards past the current one, fetching slates and cards as needed. */
     async function fill(ahead = 2) {
-        for (let guard = 0; guard < 12; guard++) {
+        const startSlates = slatesLoaded;
+        for (;;) {
             const vis = visible();
             const pos = active ? vis.findIndex(v => v.entry.id === active.entry.id) : -1;
             if (vis.length - 1 - pos >= ahead) return;
             if (entries.some(e => !e.hydrated)) { await hydrate(); continue; }
+            if (slatesLoaded - startSlates >= MAX_SLATES_PER_FILL) return;
             if (!(await loadSlate())) return;
         }
     }
@@ -105,7 +115,7 @@ export function createFeed(api, { filters = () => ({}), sendSignals = () => fals
         async next() { await fill(2); return show(index + 1); },
         async prev() { return show(index - 1); },
         current: () => active?.card || null,
-        position: () => ({ index, loaded: visible().length, hasMore, personalizing }),
+        position: () => ({ index, loaded: visible().length, hasMore, personalizing, hidden: { ...hidden }, scanned: entries.filter(e => e.hydrated).length }),
         markEngaged() { if (active) active.engaged = true; },
         async notInterested() {
             if (!active) return null;

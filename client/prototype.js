@@ -1,23 +1,24 @@
 // PROTOTYPE, throwaway (branch prototype/ui-variants). Question: "What should the For You view look like?"
-// Three structurally different variants inside the real shell view (sub-shape A), switchable from a floating bar,
-// ← / → keys, or ?jfy-variant=A|B|C in the URL. Read-only: no imports, no signals. Real feed data when it loads,
-// otherwise stub cards built from the captured live card (labelled STUB).
+// Variants inside the real shell view (sub-shape A), switchable from the floating bar, ← / → keys, or
+// ?jfy-variant=A|B|D. Read-only: Import / Not interested only toast. Live feed data, stub cards if it fails.
+// Round 1 verdict: C (queue + detail) rejected; B kept as an optional "grid" setting; A liked. D added: a
+// Sigma-styled vertical swipe feed (TikTok-like).
 import { createApi } from './api.js';
-import { parseSlate, normalizeCard } from './core/recsys.js';
+import { parseSlate, normalizeCard, fillNameMacros, CARD_BATCH } from './core/recsys.js';
 
 const VARIANTS = [
-    { key: 'A', name: 'Spotlight (one card, like the site)' },
-    { key: 'B', name: 'Grid (native Online browse cards)' },
-    { key: 'C', name: 'Queue + detail (split pane)' },
+    { key: 'A', name: 'Spotlight' },
+    { key: 'B', name: 'Grid (optional setting)' },
+    { key: 'D', name: 'Swipe feed' },
 ];
 const PARAM = 'jfy-variant';
 
 const STUB_BASE = {
-    name: 'Maki Zenin | Succubus Series | JJK part', creatorName: 'Myrandomaccount', creatorVerified: false, followers: 4104,
+    name: 'Maki Zenin | Succubus Series | JJK part', chatName: 'Maki Zenin', creatorName: 'Myrandomaccount', creatorVerified: false, followers: 4104,
     tags: ['👩‍🦰 Female', '📚 Fictional', '📺 Anime', '🔮 Magical', '❤️‍🩹 Fluff', '🌗 Switch'], customTags: ['jujutstukaisen', 'makizenin'],
     tokens: 2380, nsfw: false, proxy: true, showDefinition: true, chats: 1343, messages: 4127, favorites: 390, comments: 3,
     avatar: 'https://ella.janitorai.com/bot-avatars/-Mcem38Wk_eq33H9p2p2H.webp', createdAt: '2026-02-16T04:05:53Z',
-    descriptionHtml: '<p>"Damn it, {{user}}... This curse is a pain in the ass, but you\'re the only one I\'d let deal with it."</p><p>Story: On Valentine\'s Day, Maki Zen\'in is hit by a lingering curse from a defeated spirit…</p>',
+    descriptionHtml: '<p>"Damn it, {{user}}... This curse is a pain in the ass, but you\'re the only one I\'d let deal with it."</p><p>Story: On Valentine\'s Day, {{char}} is hit by a lingering curse from a defeated spirit…</p>',
 };
 const stubCards = () => Array.from({ length: 9 }, (_, i) => ({
     ...STUB_BASE, id: `stub-${i}`, name: `${STUB_BASE.name} #${i + 1}`, tokens: 400 + i * 700, chats: 120 * (i + 1),
@@ -34,6 +35,7 @@ function setVariant(key) {
     u.searchParams.set(PARAM, key);
     history.replaceState(history.state, '', u);
 }
+const sized = (url, w) => url ? url + (url.includes('?') ? '&' : '?') + `width=${w}` : '';
 
 export function mountPrototype(el, ctx) {
     const link = document.createElement('link');
@@ -41,43 +43,65 @@ export function mountPrototype(el, ctx) {
     link.href = new URL('./prototype.css', import.meta.url).href;
     document.head.appendChild(link);
     const esc = (s) => ctx.CoreAPI.escapeHtml(String(s ?? ''));
-    const purify = (h) => ctx.CoreAPI.safePurify(h, {}) || esc(h);
     const root = document.createElement('div');
     root.className = 'jfy-proto';
     el.innerHTML = '';
     el.appendChild(root);
 
+    const api = createApi(ctx);
     let cards = [];
     let source = 'loading';
     let selected = 0;
+    let cursor = '';
+    let hasMore = true;
+    let loading = null;
     let disposed = false;
+    let persona = '';
+    let observer = null;
+    let cleanups = [];
+    const seen = new Set();
 
-    async function load() {
-        const api = createApi(ctx);
-        try {
-            const slate = parseSlate(await api.home({}));
-            const ids = slate.items.slice(0, 12).map(i => i.id);
-            const json = ids.length ? await api.cards(ids) : { items: [] };
-            cards = (json.items || []).map(normalizeCard).filter(Boolean);
-            source = cards.length ? 'live' : 'empty';
-        } catch (e) {
-            cards = stubCards();
-            source = `STUB (live feed failed: ${e.message})`;
-        }
-        if (!cards.length) { cards = stubCards(); source = 'STUB (feed was empty)'; }
-        paint();
+    const desc = (c) => {
+        let h = fillNameMacros(c.descriptionHtml, { user: esc(persona), char: esc(c.chatName) });
+        try { h = ctx.CoreAPI.answerPronounMacros?.(h, ctx.CoreAPI.getPersonaPronouns?.()) ?? h; } catch { /* raw */ }
+        return ctx.CoreAPI.safePurify(h, {}) || esc(h);
+    };
+
+    // one slate, hydrated three at a time (the API's cap)
+    function loadMore() {
+        if (loading || !hasMore || source.startsWith('STUB')) return loading;
+        loading = (async () => {
+            try {
+                if (!persona) { try { persona = String((await ctx.CoreAPI.syncActivePersonaName?.()) || ''); } catch { /* none */ } }
+                const slate = parseSlate(await api.home({ cursor }), seen);
+                cursor = slate.cursor;
+                hasMore = !!cursor && slate.items.length > 0;
+                const ids = slate.items.map(i => i.id);
+                for (let i = 0; i < ids.length; i += CARD_BATCH) {
+                    const json = await api.cards(ids.slice(i, i + CARD_BATCH));
+                    const got = (json?.items || []).map(normalizeCard).filter(Boolean);
+                    if (got.length) { cards.push(...got); source = 'live'; appendOrPaint(); }
+                }
+            } catch (e) {
+                if (!cards.length) { cards = stubCards(); source = `STUB (live feed failed: ${e.message})`; paint(); }
+                hasMore = false;
+            } finally {
+                if (!cards.length) { cards = stubCards(); source = 'STUB (feed was empty)'; paint(); }
+                loading = null;
+            }
+        })();
+        return loading;
     }
 
     const tagsHtml = (c, n = 8) => [...c.tags, ...c.customTags.map(t => `#${t}`)].slice(0, n).map(t => `<span class="jfy-tag">${esc(t)}</span>`).join('');
     const statsHtml = (c) => `<span><i class="fa-regular fa-comments"></i> ${fmt(c.chats)}</span><span><i class="fa-regular fa-heart"></i> ${fmt(c.favorites)}</span><span><i class="fa-solid fa-coins"></i> ${fmt(c.tokens)}</span>${c.nsfw ? '<span class="jfy-nsfw">NSFW</span>' : ''}`;
-    const img = (c, w) => c.avatar ? `<img src="${esc(c.avatar + (c.avatar.includes('?') ? '&' : '?') + 'width=' + w)}" alt="" referrerpolicy="no-referrer">` : '';
 
-    // A: one big card, prev/next; the site's own interaction model
+    // A: one big card, prev/next
     function variantA() {
         const c = cards[selected];
         return `<div class="jfyA">
-            <div class="jfyA-hero">${img(c, 800)}<div class="jfyA-over"><h2>${esc(c.name)}</h2><div>@${esc(c.creatorName)} · ${fmt(c.followers)} followers</div></div></div>
-            <div class="jfyA-meta"><div class="jfy-stats">${statsHtml(c)}</div><div class="jfy-tags">${tagsHtml(c, 12)}</div><div class="jfyA-desc">${purify(c.descriptionHtml)}</div></div>
+            <div class="jfyA-hero">${c.avatar ? `<img src="${esc(sized(c.avatar, 800))}" alt="" referrerpolicy="no-referrer">` : ''}<div class="jfyA-over"><h2>${esc(c.name)}</h2><div>@${esc(c.creatorName)} · ${fmt(c.followers)} followers</div></div></div>
+            <div class="jfyA-meta"><div class="jfy-stats">${statsHtml(c)}</div><div class="jfy-tags">${tagsHtml(c, 12)}</div><div class="jfyA-desc">${desc(c)}</div></div>
             <div class="jfyA-bar">
                 <button class="glass-btn" data-act="prev" ${selected ? '' : 'disabled'}><i class="fa-solid fa-chevron-left"></i></button>
                 <button class="glass-btn" data-act="noop"><i class="fa-solid fa-ban"></i> Not interested</button>
@@ -86,41 +110,89 @@ export function mountPrototype(el, ctx) {
             </div></div>`;
     }
 
-    // B: the native Online grid; the feed becomes a sort order rather than a mode
-    function variantB() {
-        return `<div class="browse-grid jfyB">${cards.map((c, i) => `
-            <div class="browse-card" data-pick="${i}" title="${esc(c.name)}">
-                <div class="browse-card-image">${img(c, 400)}${c.nsfw ? '<span class="browse-nsfw-badge">NSFW</span>' : ''}</div>
-                <div class="browse-card-body"><div class="browse-card-name">${esc(c.name)}</div><span class="browse-card-creator-link">${esc(c.creatorName)}</span>
-                    <div class="jfy-tags">${tagsHtml(c, 3)}</div></div>
-                <div class="browse-card-footer"><span class="browse-card-stat"><i class="fa-solid fa-comments"></i> ${fmt(c.chats)}</span><span class="browse-card-stat"><i class="fa-solid fa-coins"></i> ${fmt(c.tokens)}</span></div>
-            </div>`).join('')}</div>
-            <div class="jfyB-note">Click a card → would open the JanitorAI provider's own preview (import, duplicate check).</div>`;
+    // B: native Online grid cards; the image wrapper gets .loaded on load, which is what ends the native shimmer
+    const gridCard = (c, i) => `
+        <div class="browse-card" data-pick="${i}" title="${esc(c.name)}">
+            <div class="browse-card-image">${c.avatar ? `<img src="${esc(sized(c.avatar, 400))}" alt="" referrerpolicy="no-referrer" onload="this.parentElement.classList.add('loaded')" onerror="this.parentElement.classList.add('loaded');this.src='/img/no-portrait.png'">` : ''}${c.nsfw ? '<span class="browse-nsfw-badge">NSFW</span>' : ''}</div>
+            <div class="browse-card-body"><div class="browse-card-name">${esc(c.name)}</div><span class="browse-card-creator-link">${esc(c.creatorName)}</span>
+                <div class="jfy-tags">${tagsHtml(c, 3)}</div></div>
+            <div class="browse-card-footer"><span class="browse-card-stat"><i class="fa-solid fa-comments"></i> ${fmt(c.chats)}</span><span class="browse-card-stat"><i class="fa-solid fa-coins"></i> ${fmt(c.tokens)}</span></div>
+        </div>`;
+    const variantB = () => `<div class="browse-grid jfyB">${cards.map(gridCard).join('')}</div>
+        <div class="jfyB-note">Click a card: for now it opens that card in Spotlight; the real build opens the JanitorAI preview.</div>`;
+
+    // D: vertical swipe feed. One full-height slide per character, snap scrolling, actions on a right rail.
+    const slide = (c, i) => `
+        <section class="jfyD-slide" data-i="${i}" aria-label="${esc(c.name)}">
+            <div class="jfyD-backdrop" style="background-image:url('${esc(sized(c.avatar, 200))}')"></div>
+            <img class="jfyD-portrait" src="${esc(sized(c.avatar, 900))}" alt="" referrerpolicy="no-referrer" loading="${i < 2 ? 'eager' : 'lazy'}" decoding="async">
+            <div class="jfyD-scrim"></div>
+            <div class="jfyD-info">
+                <div class="jfyD-creator"><span class="jfyD-handle">@${esc(c.creatorName)}</span>${c.creatorVerified ? ' <i class="fa-solid fa-circle-check"></i>' : ''}<span class="jfyD-dot">·</span>${fmt(c.followers)} followers</div>
+                <h2 class="jfyD-name">${esc(c.name)}</h2>
+                <div class="jfyD-desc" data-act="expand">${desc(c)}</div>
+                <div class="jfyD-tags">${tagsHtml(c, 6)}</div>
+            </div>
+            <nav class="jfyD-rail" aria-label="Actions">
+                <button type="button" data-act="noop" aria-label="Import"><i class="fa-solid fa-file-import"></i><span>Import</span></button>
+                <button type="button" data-act="noop" aria-label="Favorites"><i class="fa-regular fa-heart"></i><span>${fmt(c.favorites)}</span></button>
+                <button type="button" data-act="noop" aria-label="Chats"><i class="fa-regular fa-comments"></i><span>${fmt(c.chats)}</span></button>
+                <button type="button" data-act="expand" aria-label="Details"><i class="fa-solid fa-coins"></i><span>${fmt(c.tokens)}</span></button>
+                <button type="button" data-act="noop" aria-label="Not interested"><i class="fa-solid fa-ban"></i><span>Pass</span></button>
+            </nav>
+            ${c.nsfw ? '<span class="jfyD-nsfw">NSFW</span>' : ''}
+        </section>`;
+    const endHtml = () => hasMore ? '<i class="fa-solid fa-spinner fa-spin"></i>' : 'You are all caught up.';
+    const variantD = () => `<div class="jfyD" tabindex="0">${cards.map(slide).join('')}<div class="jfyD-end">${endHtml()}</div></div>`;
+
+    function wireD() {
+        const feedEl = root.querySelector('.jfyD');
+        if (!feedEl) return;
+        const fit = () => { const top = feedEl.getBoundingClientRect().top; feedEl.style.height = `${Math.max(360, window.innerHeight - top)}px`; };
+        fit();
+        window.addEventListener('resize', fit);
+        cleanups.push(() => window.removeEventListener('resize', fit));
+        observer = new IntersectionObserver((entries) => {
+            for (const en of entries) {
+                if (!en.isIntersecting) continue;
+                selected = Number(en.target.dataset.i);
+                if (cards.length - selected <= 3) loadMore();
+            }
+        }, { root: feedEl, threshold: 0.6 });
+        feedEl.querySelectorAll('.jfyD-slide').forEach(s => observer.observe(s));
+        const at = feedEl.querySelector(`.jfyD-slide[data-i="${selected}"]`);
+        if (at) feedEl.scrollTop = at.offsetTop;
+        feedEl.focus({ preventScroll: true });
     }
 
-    // C: a queue on the left, the selected card's full detail on the right; stacks on a phone
-    function variantC() {
-        const c = cards[selected];
-        return `<div class="jfyC">
-            <ol class="jfyC-queue">${cards.map((x, i) => `<li class="${i === selected ? 'is-on' : ''}" data-pick="${i}">${img(x, 96)}<div><b>${esc(x.name)}</b><small>${fmt(x.tokens)} tok · ${fmt(x.chats)} chats</small></div></li>`).join('')}</ol>
-            <section class="jfyC-detail">
-                <div class="jfyC-head">${img(c, 300)}<div><h2>${esc(c.name)}</h2><div>@${esc(c.creatorName)}</div><div class="jfy-stats">${statsHtml(c)}</div>
-                    <div class="jfyC-actions"><button class="glass-btn" data-act="noop"><i class="fa-solid fa-file-import"></i> Import</button><button class="glass-btn" data-act="noop"><i class="fa-solid fa-ban"></i></button></div></div></div>
-                <div class="jfy-tags">${tagsHtml(c, 14)}</div><div class="jfyC-desc">${purify(c.descriptionHtml)}</div>
-            </section></div>`;
+    // a batch landing in D appends slides instead of repainting (keeps the scroll position)
+    function appendOrPaint() {
+        const feedEl = currentVariant() === 'D' && root.querySelector('.jfyD');
+        if (!feedEl) return paint();
+        const have = feedEl.querySelectorAll('.jfyD-slide').length;
+        const end = feedEl.querySelector('.jfyD-end');
+        for (let i = have; i < cards.length; i++) {
+            end.insertAdjacentHTML('beforebegin', slide(cards[i], i));
+            observer?.observe(feedEl.querySelector(`.jfyD-slide[data-i="${i}"]`));
+        }
+        end.innerHTML = endHtml();
     }
 
     function paint() {
         if (disposed) return;
+        cleanups.forEach(f => f()); cleanups = [];
+        observer?.disconnect(); observer = null;
         const v = currentVariant();
         const meta = VARIANTS.find(x => x.key === v);
-        const body = !cards.length ? '<p class="jfy-message">Loading…</p>' : v === 'B' ? variantB() : v === 'C' ? variantC() : variantA();
-        root.innerHTML = `<div class="jfy-proto-source">PROTOTYPE · data: ${esc(source)}</div>${body}
+        const body = !cards.length ? '<p class="jfy-message">Loading…</p>' : v === 'B' ? variantB() : v === 'D' ? variantD() : variantA();
+        root.classList.toggle('is-d', v === 'D');
+        root.innerHTML = `<div class="jfy-proto-source">PROTOTYPE · data: ${esc(source)}${persona ? ` · {{user}} = ${esc(persona)}` : ''}</div>${body}
             <div class="jfy-proto-switch" role="toolbar">
                 <button type="button" data-sw="-1" aria-label="Previous variant">‹</button>
                 <span>${esc(v)} (${esc(meta.name)})</span>
                 <button type="button" data-sw="1" aria-label="Next variant">›</button>
             </div>`;
+        if (v === 'D' && cards.length) wireD();
     }
 
     function cycle(d) {
@@ -129,14 +201,25 @@ export function mountPrototype(el, ctx) {
         paint();
     }
 
+    function stepD(d) {
+        const feedEl = root.querySelector('.jfyD');
+        const to = feedEl?.querySelector(`.jfyD-slide[data-i="${Math.max(0, Math.min(cards.length - 1, selected + d))}"]`);
+        if (!to) return;
+        const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+        feedEl.scrollTo({ top: to.offsetTop, behavior: smooth ? 'smooth' : 'auto' });
+        // a throttled or hidden page can drop a smooth scroll; land it anyway
+        if (smooth) setTimeout(() => { if (Math.abs(feedEl.scrollTop - to.offsetTop) > 4) feedEl.scrollTop = to.offsetTop; }, 650);
+    }
+
     root.addEventListener('click', (ev) => {
         const sw = ev.target.closest('[data-sw]');
         if (sw) return cycle(Number(sw.dataset.sw));
         const pick = ev.target.closest('[data-pick]');
-        if (pick) { selected = Number(pick.dataset.pick); if (currentVariant() === 'B') setVariant('A'); return paint(); }
+        if (pick) { selected = Number(pick.dataset.pick); setVariant('A'); return paint(); }
         const act = ev.target.closest('[data-act]')?.dataset.act;
-        if (act === 'next') { selected = Math.min(cards.length - 1, selected + 1); paint(); }
+        if (act === 'next') { selected = Math.min(cards.length - 1, selected + 1); if (cards.length - selected <= 3) loadMore(); paint(); }
         else if (act === 'prev') { selected = Math.max(0, selected - 1); paint(); }
+        else if (act === 'expand') ev.target.closest('.jfyD-slide')?.classList.toggle('is-open');
         else if (act === 'noop') ctx.CoreAPI.showToast?.('Prototype: not wired', 'info');
     });
 
@@ -144,13 +227,15 @@ export function mountPrototype(el, ctx) {
         if (!root.isConnected || ev.target.closest?.('input, textarea, select, [contenteditable]')) return;
         if (ev.key === 'ArrowLeft') cycle(-1);
         else if (ev.key === 'ArrowRight') cycle(1);
+        else if (currentVariant() === 'D' && (ev.key === 'ArrowDown' || ev.key === 'j')) { ev.preventDefault(); stepD(1); }
+        else if (currentVariant() === 'D' && (ev.key === 'ArrowUp' || ev.key === 'k')) { ev.preventDefault(); stepD(-1); }
     };
     document.addEventListener('keydown', onKey);
 
     return {
-        enter() { if (!cards.length) load(); else paint(); },
+        enter() { if (!cards.length) { paint(); loadMore(); } else paint(); },
         leave() {},
-        refresh() { cards = []; selected = 0; load(); },
-        dispose() { disposed = true; document.removeEventListener('keydown', onKey); link.remove(); root.remove(); },
+        refresh() { cards = []; seen.clear(); cursor = ''; hasMore = true; selected = 0; source = 'loading'; paint(); loadMore(); },
+        dispose() { disposed = true; cleanups.forEach(f => f()); observer?.disconnect(); document.removeEventListener('keydown', onKey); link.remove(); root.remove(); },
     };
 }

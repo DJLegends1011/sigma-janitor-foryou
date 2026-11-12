@@ -173,7 +173,19 @@ export function mountPrototype(el, ctx) {
         }
         // backdrop: layer 0 shows the slide at floor(position), layer 1 the next one, faded in by the fraction
         const layers = root.querySelectorAll('.jfyD-bg-layer');
-        const bgOf = (i) => cards[i]?.avatar ? `url("${sized(cards[i].avatar, 200).replace(/"/g, '%22')}")` : 'none';
+        // the backdrop uses the portrait's own URL (900w): one download serves both, and the portrait preload covers it
+        const bgUrl = (i) => cards[i]?.avatar ? sized(cards[i].avatar, 900) : '';
+        const bgOf = (i) => bgUrl(i) ? `url("${bgUrl(i).replace(/"/g, '%22')}")` : 'none';
+        const warmed = new Set();
+        const warm = (i) => {
+            const u = bgUrl(i);
+            if (!u || warmed.has(u)) return;
+            warmed.add(u);
+            const im = new Image();
+            im.referrerPolicy = 'no-referrer';
+            im.decoding = 'async';
+            im.src = u;
+        };
         let shownA = -1, shownB = -1, raf = 0;
         const paintBg = () => {
             raf = 0;
@@ -192,6 +204,7 @@ export function mountPrototype(el, ctx) {
             for (const en of entries) {
                 if (!en.isIntersecting) continue;
                 selected = Number(en.target.dataset.i);
+                for (let k = 0; k <= 3; k++) warm(selected + k);
                 for (let k = 1; k <= 3; k++) {
                     const img = feedEl.querySelector(`.jfyD-slide[data-i="${selected + k}"] .jfyD-portrait`);
                     if (img && img.loading !== 'eager') img.loading = 'eager';
@@ -202,6 +215,7 @@ export function mountPrototype(el, ctx) {
         feedEl.querySelectorAll('.jfyD-slide').forEach(s => observer.observe(s));
         const at = feedEl.querySelector(`.jfyD-slide[data-i="${selected}"]`);
         if (at) feedEl.scrollTop = at.offsetTop;
+        for (let k = 0; k <= 3; k++) warm(selected + k);
         paintBg();
         feedEl.focus({ preventScroll: true });
     }

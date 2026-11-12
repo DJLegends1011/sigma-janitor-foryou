@@ -138,14 +138,14 @@ export function mountPrototype(el, ctx) {
             <div class="jfyD-scrim"></div>
             <div class="jfyD-dim"></div>
             <div class="jfyD-info">
-                <div class="jfyD-creator"><span class="jfyD-handle">@${esc(c.creatorName)}</span>${c.creatorVerified ? ' <i class="fa-solid fa-circle-check"></i>' : ''}<span class="jfyD-dot">·</span>${fmt(c.followers)} followers</div>
+                <div class="jfyD-creator"><button type="button" class="jfyD-handle" data-act="creator" data-name="${esc(c.creatorName)}" title="See all characters by ${esc(c.creatorName)}">@${esc(c.creatorName)}</button>${c.creatorVerified ? ' <i class="fa-solid fa-circle-check"></i>' : ''}<span class="jfyD-dot">·</span>${fmt(c.followers)} followers</div>
                 <h2 class="jfyD-name">${esc(c.name)}</h2>
                 <div class="jfyD-desc" data-act="expand"><div class="jfyD-desc-inner">${desc(c)}</div></div>
-                <div class="jfyD-tags">${tagsHtml(c, 6)}</div>
+                <div class="jfyD-tags">${[...c.tags, ...c.customTags.map(t => `#${t}`)].slice(0, 6).map(t => `<button type="button" class="jfy-tag" data-act="tag" data-tag="${esc(t)}" title="Browse ${esc(t)} on JanitorAI">${esc(t)}</button>`).join('')}</div>
             </div>
             <nav class="jfyD-rail" aria-label="Actions">
                 <button type="button" data-act="noop" aria-label="Import"><i class="fa-solid fa-file-import"></i><span>Import</span></button>
-                <a class="jfyD-open" href="${esc(c.url)}" target="_blank" rel="noopener noreferrer" aria-label="Open on JanitorAI" title="Open on JanitorAI"><i><img src="https://ella.janitorai.com/favicon.ico" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'fa-solid fa-arrow-up-right-from-square'}))"></i><span>JanitorAI</span></a>
+                <a class="jfyD-open" href="${esc(c.url)}" target="_blank" rel="noopener noreferrer" aria-label="Open on JanitorAI" title="Open on JanitorAI"><i class="fa-solid fa-external-link"></i><span>Open</span></a>
                 <button type="button" data-act="noop" aria-label="Favorites"><i class="fa-regular fa-heart"></i><span>${fmt(c.favorites)}</span></button>
                 <button type="button" data-act="noop" aria-label="Chats"><i class="fa-regular fa-comments"></i><span>${fmt(c.chats)}</span></button>
                 <button type="button" data-act="expand" aria-label="Details"><i class="fa-solid fa-coins"></i><span>${fmt(c.tokens)}</span></button>
@@ -243,6 +243,11 @@ export function mountPrototype(el, ctx) {
         else if (act === 'prev') { selected = Math.max(0, selected - 1); paint(); }
         else if (act === 'expand') ev.target.closest('.jfyD-slide')?.classList.toggle('is-open');
         else if (act === 'noop') ctx.CoreAPI.showToast?.('Prototype: not wired', 'info');
+        else if (act === 'creator' || act === 'tag') {
+            const el = ev.target.closest('[data-act]');
+            const what = act === 'creator' ? `characters by ${el.dataset.name}` : `the ${el.dataset.tag} tag`;
+            ctx.CoreAPI.showToast?.(`Would open Online > JanitorAI with ${what} (needs a Sigma door to open Online pre-filtered)`, 'info');
+        }
     });
 
     const onKey = (ev) => {

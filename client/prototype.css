@@ -35,13 +35,17 @@
 .jfyD::-webkit-scrollbar { display: none; }
 .jfyD-slide {
     position: relative; height: 100%; scroll-snap-align: start; scroll-snap-stop: always;
+    padding-block: 12px; /* the stages of two slides never meet edge to edge */
     display: grid; grid-template-columns: minmax(0, 1fr) min(560px, 100%) 76px minmax(0, 1fr);
-    overflow: hidden; isolation: isolate;
+    overflow: clip; isolation: isolate; /* clip, not hidden: hidden would make the slide a scroll container and break view() */
 }
 .jfyD-backdrop {
     position: absolute; inset: -40px; z-index: -2;
     background-size: cover; background-position: center 20%;
     filter: blur(36px) saturate(1.1) brightness(.45); transform: scale(1.05);
+    /* feathered top/bottom: two slides' backdrops fade into each other instead of meeting at a hard line */
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);
 }
 .jfyD-stage {
     grid-column: 2; grid-row: 1; position: relative; overflow: hidden; z-index: 0;
@@ -73,7 +77,11 @@
     text-shadow: var(--cl-text-halo, 0 0 3px rgba(0,0,0,.5));
 }
 .jfyD-creator { font-size: var(--font-md, .85rem); opacity: .9; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.jfyD-handle { font-weight: 600; }
+.jfyD-handle { all: unset; font-weight: 600; cursor: pointer; }
+.jfyD-handle:hover { text-decoration: underline; }
+.jfyD-handle:focus-visible, .jfyD-tags .jfy-tag:focus-visible { outline: 2px solid var(--accent, #4a9eff); outline-offset: 2px; }
+.jfyD-tags .jfy-tag { border: 0; font: inherit; cursor: pointer; transition: background var(--dur-slow, .35s) ease; }
+.jfyD-tags .jfy-tag:hover { background: rgba(var(--accent-rgb, 74,158,255), .35); }
 .jfyD-creator .fa-circle-check { color: var(--accent, #4a9eff); }
 .jfyD-dot { opacity: .6; margin: 0 2px; }
 .jfyD-name { margin: 0; font-size: var(--font-xl, 1.3rem); line-height: 1.2; text-wrap: balance; }
@@ -123,7 +131,6 @@
     transition: background var(--dur-slow, .35s) var(--ease-standard, ease), transform .15s ease;
 }
 .jfyD-rail a { text-decoration: none; }
-.jfyD-rail a i img { width: 22px; height: 22px; border-radius: 4px; display: block; }
 .jfyD-rail a:hover i, .jfyD-rail button:hover i { background: rgba(var(--accent-rgb, 74,158,255), .28); border-color: rgba(var(--accent-rgb, 74,158,255), .55); }
 .jfyD-rail button:active i, .jfyD-rail a:active i { transform: scale(.92); }
 .jfyD-rail a:focus-visible i, .jfyD-rail button:focus-visible i { outline: 2px solid var(--accent, #4a9eff); outline-offset: 2px; }
@@ -146,4 +153,35 @@
 @media (prefers-reduced-motion: reduce) {
     .jfyD-rail i, .jfyD-dim, .jfyD-desc, .jfyD-portrait { transition: none; }
     .jfyD-stage::before { animation: none; }
+}
+
+/* Slide-to-slide transition, driven by the scroll itself: the slide leaving shrinks a little and dims,
+   the one arriving grows into place. Browsers without scroll-driven animations just snap, as before. */
+@supports (animation-timeline: view()) {
+    .jfyD-stage, .jfyD-info, .jfyD-rail {
+        animation: jfy-slide-pass linear both;
+        animation-timeline: view(block);
+        animation-range: cover 0% cover 100%;
+    }
+    .jfyD-backdrop { animation: jfy-backdrop-pass linear both; animation-timeline: view(block); animation-range: cover 0% cover 100%; }
+}
+@keyframes jfy-slide-pass {
+    0%   { transform: scale(.9);  opacity: .35; }
+    40%, 60% { transform: none;   opacity: 1; }
+    100% { transform: scale(.9);  opacity: .35; }
+}
+@keyframes jfy-backdrop-pass {
+    0%, 100% { opacity: .4; }
+    40%, 60% { opacity: 1; }
+}
+@media (max-width: 720px) {
+    .jfyD-slide { padding-block: 0; }
+    @keyframes jfy-slide-pass {
+        0%   { transform: scale(.94); opacity: .5; }
+        40%, 60% { transform: none;   opacity: 1; }
+        100% { transform: scale(.94); opacity: .5; }
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .jfyD-stage, .jfyD-info, .jfyD-rail, .jfyD-backdrop { animation: none; }
 }

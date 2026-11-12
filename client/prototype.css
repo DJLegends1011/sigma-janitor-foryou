@@ -1,0 +1,42 @@
+/* PROTOTYPE, throwaway: ui-variants branch only */
+.jfy-proto { box-sizing: border-box; padding: 12px 12px 72px; min-width: 0; }
+.jfy-proto * { box-sizing: border-box; min-width: 0; }
+.jfy-proto-source { font-size: .75rem; opacity: .6; margin-bottom: 8px; letter-spacing: .04em; }
+.jfy-proto-switch { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 9999; display: flex; align-items: center; gap: 10px;
+    padding: 6px 10px; border-radius: 999px; background: #ff0; color: #000; font: 600 13px/1 system-ui, sans-serif; box-shadow: 0 4px 18px rgba(0,0,0,.45); }
+.jfy-proto-switch button { all: unset; cursor: pointer; padding: 2px 10px; font-size: 18px; }
+
+/* A */
+.jfyA { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.jfyA-hero { position: relative; border-radius: 16px; overflow: hidden; max-height: 55vh; }
+.jfyA-hero img { width: 100%; display: block; object-fit: cover; max-height: 55vh; }
+.jfyA-over { position: absolute; inset: auto 0 0 0; padding: 18px; background: linear-gradient(transparent, rgba(0,0,0,.85)); color: #fff; }
+.jfyA-over h2 { margin: 0 0 4px; }
+.jfyA-meta { display: flex; flex-direction: column; gap: 8px; }
+.jfyA-desc { max-height: 30vh; overflow: auto; }
+.jfyA-bar { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+/* B */
+.jfyB .browse-card { cursor: pointer; }
+.jfyB .browse-card-image img { width: 100%; height: 100%; object-fit: cover; }
+.jfyB-note { opacity: .6; font-size: .85rem; margin-top: 10px; }
+
+/* C */
+.jfyC { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 14px; }
+.jfyC-queue { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 75vh; overflow: auto; }
+.jfyC-queue li { display: flex; gap: 8px; align-items: center; padding: 6px; border-radius: 10px; cursor: pointer; }
+.jfyC-queue li.is-on, .jfyC-queue li:hover { background: rgba(127,127,127,.18); }
+.jfyC-queue img { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex: none; }
+.jfyC-queue b { display: block; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jfyC-queue small { opacity: .65; }
+.jfyC-head { display: flex; gap: 14px; flex-wrap: wrap; }
+.jfyC-head img { width: 160px; border-radius: 12px; }
+.jfyC-head h2 { margin: 0 0 4px; }
+.jfyC-actions { display: flex; gap: 8px; margin-top: 8px; }
+.jfyC-desc { margin-top: 10px; max-height: 45vh; overflow: auto; }
+@media (max-width: 520px) {
+    .jfyC { grid-template-columns: 1fr; }
+    .jfyC-queue { flex-direction: row; overflow-x: auto; max-height: none; }
+    .jfyC-queue li { flex: 0 0 auto; }
+    .jfyC-queue li div { display: none; }
+}

@@ -1,5 +1,5 @@
 // Janitor For You: JanitorAI's personalized "For you" feed inside Sigma.
-import { mountView } from './view.js';
+import { mountPrototype } from './prototype.js'; // PROTOTYPE branch only
 
 const VIEW = 'ext:janitor-foryou/foryou';
 let view = null;
@@ -18,7 +18,7 @@ export default {
             id: 'foryou',
             label: 'For You',
             icon: 'fa-wand-magic-sparkles',
-            render(el) { view = mountView(el, ctx); },
+            render(el) { view = mountPrototype(el, ctx); },
             enter: () => view?.enter(),
             leave: () => view?.leave(),
             refresh: () => view?.refresh(),

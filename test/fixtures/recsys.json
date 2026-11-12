@@ -1,0 +1,141 @@
+{
+ "home": {
+  "next_cursor": "v3.N00nLkuTQImqAl8mxX8jl7X8qsKAW0f1j5mTef_w7TDIlCIiUH9K0rIV19VIfqvs.W10.dHdvLXRvd2VyLXYxOjFmYTc4MGY4ODA2MzVhNDYxZTc0YWY1OWY3NTI1OGE5ZTM5NjgyODNmNTMxNzlkMDM4Y2I1MTFlZWE5MGZiYWQ6bWl4OTAtMTAtdjI",
+  "items": [
+   {
+    "character_id": "374d272e-4b93-4089-aa02-5f26c57f2397",
+    "impression_id": "d2cc86d3-bf92-4352-8953-a4e52612c282",
+    "position": 1,
+    "rec_source": "vespa_ann"
+   },
+   {
+    "character_id": "b5fcaac2-805b-47f5-8f99-9379fff0ed30",
+    "impression_id": "a68238e2-08e9-416c-9c01-b583d71a23af",
+    "position": 2,
+    "rec_source": "vespa_ann"
+   },
+   {
+    "character_id": "c8942222-507f-4ad2-b215-d7d5487eabec",
+    "impression_id": "74bbc4d8-ea5b-4ae1-bc84-6f7d60c47d1c",
+    "position": 3,
+    "rec_source": "vespa_ann"
+   }
+  ],
+  "model_version": "two-tower-v1:1fa780f880635a461e74af59f75258a9e3968283f53179d038cb511eea90fbad",
+  "personalization": "ready",
+  "request_id": "af2941af-79af-41a0-961b-89cc4730812f",
+  "surface_id": "home_feed"
+ },
+ "cards": {
+  "items": [
+   {
+    "character": {
+     "avatar": "-Mcem38Wk_eq33H9p2p2H.webp",
+     "chat_name": "",
+     "created_at": "2026-02-16T04:02:53.139043+00:00",
+     "creator_display_prefs": null,
+     "creator_id": "f3515e60-7451-4bf9-98f5-f95e975e7ef0",
+     "creator_name": "Myrandomaccount",
+     "creator_plusbadge": false,
+     "creator_verified": false,
+     "custom_tags": [
+      "TheValentine",
+      "jujutstukaisen",
+      "makizenin",
+      "proxyenabled"
+     ],
+     "description": "<p><span style=\"color: rgb(36, 203, 134);\">\"Damn it, {{user}}... This curse is a pain in the ass, but you're the only one I'd let deal with it. Make this Valentine's worth it, or I'll make you regret it.\"</span></p><hr><p></p><p>Art is from <a rel=\"noopener noreferrer\" href=\"https://www.reddit.com/r/blackwhiplash_ai/comments/1r4klm2/which_succubus_would_you_want_for_valentines/\" target=\"_blank\">Pornacciguess</a></p><p>Story: On Valentine's Day, Maki Zen'in is hit by a lingering curse from a defeated spirit, transforming her into a voluptuous succubus with horns, wings, a heart-tipped tail, and dramatically exaggerated curves. The curse's condition is clear: Maki must spend intimate time with someone close to her—specifically {{user}}, her trusted comrade and long-suppressed romantic interest—and fully satisfy them, ensuring {{user}} feels genuinely happy, fulfilled, and content on this romantic holiday through affection, closeness, intimacy, or whatever it takes. Physical release alone won't cut it; the curse demands emotional satisfaction from {{user}}'s perspective. Sweating profusely from the infernal heat and visibly frustrated, Maki confronts {{user}} in the empty Jujutsu High training hall late at night.</p>",
+     "first_published_at": "2026-02-16T04:05:53.054113",
+     "id": "374d272e-4b93-4089-aa02-5f26c57f2397",
+     "is_deleted": false,
+     "is_force_remove": false,
+     "is_nsfw": true,
+     "is_proxy_enabled": true,
+     "is_public": true,
+     "name": "Maki Zenin | Succubus Series | JJK part",
+     "scheduled_publish_at": null,
+     "showdefinition": true,
+     "stats": {
+      "chat": 1343,
+      "message": 4127
+     },
+     "tags": [
+      {
+       "created_at": "2023-04-04T09:18:30.194451+00:00",
+       "description": "Female characters",
+       "id": 2,
+       "name": "👩‍🦰 Female",
+       "slug": "female"
+      },
+      {
+       "created_at": "2023-04-04T09:18:30.194451+00:00",
+       "description": "Fictional characters",
+       "id": 6,
+       "name": "📚 Fictional",
+       "slug": "fictional"
+      },
+      {
+       "created_at": "2023-04-04T09:18:30.194451+00:00",
+       "description": "Characters originating from anime or manga",
+       "id": 9,
+       "name": "📺 Anime",
+       "slug": "anime"
+      },
+      {
+       "created_at": "2023-04-04T09:18:30.194451+00:00",
+       "description": "Characters with magical abilities",
+       "id": 15,
+       "name": "🔮 Magical",
+       "slug": "magical"
+      },
+      {
+       "created_at": "2024-01-27T18:23:36.699584+00:00",
+       "description": "A bot that has been made with little plot and is for the sole purpose of being extremely sexually explicit",
+       "id": 46,
+       "name": "❤️‍🔥 Smut",
+       "slug": "smut"
+      },
+      {
+       "created_at": "2024-01-27T18:24:49.344802+00:00",
+       "description": "Wholesome and sweet content meant to bring comfort",
+       "id": 50,
+       "name": "❤️‍🩹 Fluff",
+       "slug": "fluff"
+      },
+      {
+       "created_at": "2024-02-10T23:12:06.444398+00:00",
+       "description": "For bots that can be both dominant and submissive.",
+       "id": 56,
+       "name": "🌗 Switch",
+       "slug": "switch"
+      }
+     ],
+     "total_tokens": 2380,
+     "updated_at": "2026-03-08T04:41:00.294498+00:00"
+    },
+    "character_id": "374d272e-4b93-4089-aa02-5f26c57f2397",
+    "favorite_count": 390,
+    "is_favorited": false,
+    "comment_count": 3,
+    "comment_preview": {
+     "avatars": [
+      "b4b265a8-a475-4ba7-97eb-205eaf5e6a59_060d4664-dea7-43b1-b1a6-a11e5ab9b0b0.webp",
+      "73db4a32-eaf2-4edf-a126-d762397c6bfd_b48398db-5618-46cc-bac3-dc48798511cf.webp",
+      "Qz5bCX6-oyYYSsS38xd6X.webp"
+     ],
+     "top_comment": {
+      "content": "Maki <3",
+      "created_at": "2026-03-06T08:36:46.217Z",
+      "like_count": 0,
+      "user_name": "Hashitposting"
+     }
+    },
+    "is_following_creator": false,
+    "creator_profile": {
+     "avatar": "f3515e60-7451-4bf9-98f5-f95e975e7ef0_530bffa5-121f-44cb-b703-a1a22630442a.webp",
+     "followers_count": 4104
+    }
+   }
+  ]
+ }
+}

@@ -1,0 +1,25 @@
+.jfy-root { box-sizing: border-box; min-width: 0; max-width: 760px; margin: 0 auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.jfy-root * { box-sizing: border-box; min-width: 0; }
+.jfy-card { display: flex; gap: 14px; flex-wrap: wrap; }
+.jfy-media { flex: 0 0 240px; }
+.jfy-media img { width: 100%; border-radius: 12px; display: block; }
+.jfy-body { flex: 1 1 300px; display: flex; flex-direction: column; gap: 6px; }
+.jfy-name { margin: 0; font-size: 1.25rem; }
+.jfy-creator, .jfy-pos { opacity: .75; font-size: .9rem; }
+.jfy-stats { display: flex; flex-wrap: wrap; gap: 12px; font-size: .9rem; }
+.jfy-nsfw { color: var(--danger, #e5484d); font-weight: 600; }
+.jfy-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.jfy-tag { padding: 2px 8px; border-radius: 999px; background: rgba(127,127,127,.15); font-size: .8rem; }
+.jfy-desc { max-height: 40vh; overflow: auto; line-height: 1.45; }
+.jfy-desc img { max-width: 100%; }
+.jfy-bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; }
+.jfy-bar .glass-btn { text-decoration: none; }
+.jfy-message { padding: 24px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.jfy-error p { color: var(--danger, #e5484d); }
+.jfy-setting { display: flex; align-items: center; gap: 8px; margin: 6px 0; flex-wrap: wrap; }
+.jfy-num { width: 90px; }
+@media (max-width: 520px) {
+    .jfy-media { flex-basis: 100%; }
+    .jfy-media img { max-height: 45vh; object-fit: cover; }
+    .jfy-bar .glass-btn { flex: 1 1 40%; justify-content: center; }
+}

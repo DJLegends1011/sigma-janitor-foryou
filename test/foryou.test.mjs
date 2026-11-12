@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { homePath, cardsPath, parseSlate, normalizeCard, passesFilters, makeEvent, cardEventPayloads, avatarUrl, characterUrl } from '../client/core/recsys.js';
+import { fillNameMacros, CARD_BATCH, homePath, cardsPath, parseSlate, normalizeCard, passesFilters, makeEvent, cardEventPayloads, avatarUrl, characterUrl } from '../client/core/recsys.js';
 import { stopgapJanitorToken, decodeExpiry } from '../client/core/session.js';
 import { createFeed } from '../client/core/feed.js';
 import { register } from '../server/index.js';
@@ -19,6 +19,14 @@ test('paths stay under the consumer prefix and validate ids', () => {
     assert.match(homePath({ cursor: 'v3.a.b' }), /&cursor=v3\.a\.b$/);
     assert.equal(cardsPath([id(1), 'nope', id(2)]), `/hampter/recsys/home/cards?ids=${encodeURIComponent(`${id(1)},${id(2)}`)}`);
     assert.throws(() => cardsPath(['../x']));
+    assert.equal(CARD_BATCH, 3);
+    assert.throws(() => cardsPath([id(1), id(2), id(3), id(4)]), /at most 3/, 'the API answers 400 past three');
+});
+
+test('macros: {{user}} and {{char}} filled, case-insensitive; a missing name leaves the macro', () => {
+    assert.equal(fillNameMacros('Hi {{user}}, I am {{Char}}. {{ USER }}!', { user: 'DJ', char: 'Maki' }), 'Hi DJ, I am Maki. DJ!');
+    assert.equal(fillNameMacros('Hi {{user}}', {}), 'Hi {{user}}');
+    assert.equal(normalizeCard(fx.cards.items[0]).chatName, 'Maki Zenin', 'no chat_name: the name before the first |');
 });
 
 // ---------- parsing ----------
@@ -102,6 +110,7 @@ function fakeApi({ pages = 2, perPage = 5, nsfwEvery = 0, pending = 0 } = {}) {
         async personalization() { calls.personalization++; return { status: 'ready' }; },
         async cards(ids) {
             calls.cards++;
+            if (ids.length > 3) throw new Error('400 ids must contain no more than 3 elements');
             return { items: ids.map((cid, i) => ({ character_id: cid, favorite_count: 1, character: { id: cid, name: `C${cid.slice(-3)}`, creator_id: 'cr', total_tokens: 500, is_nsfw: nsfwEvery ? (Number(cid.slice(-3)) % nsfwEvery === 0) : false, is_public: true } })) };
         },
         async events(batch) { calls.events.push(...batch); },

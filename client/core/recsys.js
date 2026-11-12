@@ -9,7 +9,7 @@
 export const RECSYS_PREFIX = '/hampter/recsys/';
 export const SURFACE_ID = 'home_feed';
 export const SLATE_SIZE = 20;
-export const CARD_BATCH = 4;
+export const CARD_BATCH = 3; // the API refuses more: 400 "ids must contain no more than 3 elements" (the site sends 2)
 export const QUICK_SKIP_MS = 2000;
 export const MAX_EVENT_PAYLOAD = 4096;
 export const AVATAR_BASE = 'https://ella.janitorai.com/bot-avatars/';
@@ -27,6 +27,7 @@ export function homePath({ limit = SLATE_SIZE, cursor = '' } = {}) {
 export function cardsPath(ids, locale = '') {
     const clean = (ids || []).filter(isUuid);
     if (!clean.length) throw new Error('cardsPath: no valid ids');
+    if (clean.length > CARD_BATCH) throw new Error(`cardsPath: at most ${CARD_BATCH} ids per request`);
     const q = new URLSearchParams({ ids: clean.join(',') });
     if (locale) q.set('content_locale', String(locale));
     return `${RECSYS_PREFIX}home/cards?${q}`;
@@ -78,6 +79,7 @@ export function normalizeCard(item) {
     return {
         id: c.id,
         name: String(c.name || 'Unnamed'),
+        chatName: String(c.chat_name || '').trim() || String(c.name || '').split('|')[0].trim(),
         avatar: avatarUrl(c.avatar),
         descriptionHtml: String(c.description || ''),
         creatorId: String(c.creator_id || ''),
@@ -97,6 +99,18 @@ export function normalizeCard(item) {
         createdAt: String(c.first_published_at || c.created_at || ''),
         url: characterUrl(c.id, c.name),
     };
+}
+
+/**
+ * {{user}} / {{char}} in display text, answered the way a chat would: the active Sigma persona's name and the
+ * character's chat name. Case-insensitive like Sigma's own macros; a missing name leaves the macro as written.
+ * Pronoun macros are left for CoreAPI.answerPronounMacros (the caller applies it after this).
+ */
+export function fillNameMacros(text, { user = '', char = '' } = {}) {
+    let out = String(text ?? '');
+    if (user) out = out.replace(/\{\{\s*user\s*\}\}/gi, user);
+    if (char) out = out.replace(/\{\{\s*char\s*\}\}/gi, char);
+    return out;
 }
 
 /** Client-side filters on top of the recommender (it has no NSFW or size knobs of its own). */

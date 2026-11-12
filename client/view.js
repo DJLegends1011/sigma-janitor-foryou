@@ -2,6 +2,7 @@
 // Open on JanitorAI. Import goes through the JanitorAI provider's own preview later (see README "Next steps").
 import { createApi } from './api.js';
 import { createFeed } from './core/feed.js';
+import { fillNameMacros } from './core/recsys.js';
 
 let purifyConfig = null;
 async function loadPurifyConfig() {
@@ -24,6 +25,15 @@ export function mountView(el, ctx) {
     let feed = null;
     let busy = Promise.resolve();
     let disposed = false;
+    let personaName = '';
+    const readPersona = async () => {
+        try { personaName = String((await ctx.CoreAPI.syncActivePersonaName?.()) || ''); } catch { personaName = ''; }
+    };
+    // names go into HTML, so they are escaped first; pronoun macros answered from the persona as a chat would
+    const macros = (html, card) => {
+        const out = fillNameMacros(html, { user: esc(personaName), char: esc(card.chatName) });
+        try { return ctx.CoreAPI.answerPronounMacros?.(out, ctx.CoreAPI.getPersonaPronouns?.()) ?? out; } catch { return out; }
+    };
 
     const newFeed = () => createFeed(api, {
         filters: () => ({ showNsfw: ctx.settings.get('showNsfw') === true, minTokens: Number(ctx.settings.get('minTokens')) || 0 }),
@@ -40,7 +50,8 @@ export function mountView(el, ctx) {
         if (!card) { message('Nothing left in your feed right now.'); return; }
         const pos = feed.position();
         const cfg = await loadPurifyConfig();
-        const desc = ctx.CoreAPI.safePurify(card.descriptionHtml, cfg) || esc(card.descriptionHtml);
+        const html = macros(card.descriptionHtml, card);
+        const desc = ctx.CoreAPI.safePurify(html, cfg) || esc(html);
         const tags = [...card.tags, ...card.customTags.map(t => `#${t}`)].slice(0, 14);
         root.innerHTML = `
         <div class="jfy-card">
@@ -89,7 +100,7 @@ export function mountView(el, ctx) {
     function start() {
         root.innerHTML = '<div class="jfy-message"><p>Loading your feed…</p></div>';
         feed = newFeed();
-        return run(() => feed.start());
+        return run(async () => { await readPersona(); return feed.start(); });
     }
 
     return {

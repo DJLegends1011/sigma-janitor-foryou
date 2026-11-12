@@ -4,6 +4,9 @@
 .jfy-proto.is-d { padding: 0; }
 .jfy-proto-source { font-size: .75rem; opacity: .6; margin-bottom: 8px; letter-spacing: .04em; }
 .jfy-proto.is-d .jfy-proto-source { position: absolute; z-index: 5; margin: 8px 12px; pointer-events: none; }
+/* full bleed: the feed covers the view's own padding, so the app background never shows around it */
+.jfy-proto.jfy-fill .jfyD { position: absolute; inset: 0; height: auto !important; z-index: 1; }
+.jfy-proto.jfy-fill .jfy-proto-source { z-index: 6; }
 .jfy-proto-switch { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 9999; display: flex; align-items: center; gap: 10px;
     padding: 6px 10px; border-radius: 999px; background: #ff0; color: #000; font: 600 13px/1 system-ui, sans-serif; box-shadow: 0 4px 18px rgba(0,0,0,.45); }
 .jfy-proto.is-d .jfy-proto-switch { bottom: auto; top: 64px; }
@@ -40,12 +43,26 @@
     background-size: cover; background-position: center 20%;
     filter: blur(36px) saturate(1.1) brightness(.45); transform: scale(1.05);
 }
-.jfyD-portrait {
-    grid-column: 2; grid-row: 1; align-self: stretch; justify-self: stretch;
-    width: 100%; height: 100%; object-fit: cover; object-position: center 18%;
-    border-radius: var(--radius-xl, 10px); z-index: 0;
-    box-shadow: 0 12px 48px rgba(0,0,0,.5);
+.jfyD-stage {
+    grid-column: 2; grid-row: 1; position: relative; overflow: hidden; z-index: 0;
+    border-radius: var(--radius-xl, 10px); box-shadow: 0 12px 48px rgba(0,0,0,.5);
+    background: var(--cl-shade-30, rgba(0,0,0,.3));
 }
+/* Sigma's browse-card shimmer (browse-shared.css .browse-card-image::before), until the portrait loads */
+.jfyD-stage::before {
+    content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: linear-gradient(110deg, transparent 30%, var(--cl-ghost-mid, rgba(255,255,255,.05)) 50%, transparent 70%);
+    background-size: 200% 100%; animation: browse-img-shimmer 1.8s ease-in-out infinite;
+}
+.jfyD-stage.loaded::before { display: none; }
+.jfyD-portrait {
+    width: 100%; height: 100%; display: block; object-fit: cover; object-position: center 18%;
+    opacity: 0; transform: scale(1.02);
+    transition: opacity var(--dur-slow, .35s) ease, transform .6s var(--ease-standard, ease);
+}
+.jfyD-stage.loaded .jfyD-portrait { opacity: 1; transform: none; }
+.jfyD-stage.failed .jfyD-portrait { opacity: .25; }
+@keyframes browse-img-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 .jfyD-scrim {
     grid-column: 2; grid-row: 1; z-index: 1; pointer-events: none; border-radius: var(--radius-xl, 10px);
     background: linear-gradient(to top, rgba(0,0,0,.88) 0%, rgba(0,0,0,.55) 28%, transparent 55%);
@@ -60,17 +77,35 @@
 .jfyD-creator .fa-circle-check { color: var(--accent, #4a9eff); }
 .jfyD-dot { opacity: .6; margin: 0 2px; }
 .jfyD-name { margin: 0; font-size: var(--font-xl, 1.3rem); line-height: 1.2; text-wrap: balance; }
+/* Collapsed: a hard 2-line-high window with a fade, not -webkit-line-clamp. A clamp only truncates inline
+   text; creator bios are blocks (p, h1, highlighted spans), which kept drawing below the "...". */
 .jfyD-desc {
+    --jfy-lines: 2.9em;
     font-size: var(--font-md, .85rem); line-height: 1.45; opacity: .92; cursor: pointer;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    position: relative; overflow: hidden; max-height: var(--jfy-lines);
+    -webkit-mask-image: linear-gradient(to bottom, #000 45%, transparent 100%);
+            mask-image: linear-gradient(to bottom, #000 45%, transparent 100%);
+    transition: max-height .45s var(--ease-expand, cubic-bezier(.22,.61,.36,1));
 }
+.jfyD-desc-inner { overflow: hidden; }
 .jfyD-desc p { margin: 0 0 .4em; }
 .jfyD-desc img { display: none; }
 .jfyD-slide.is-open .jfyD-desc {
-    -webkit-line-clamp: unset; display: block; max-height: 45vh; overflow: auto;
-    padding-right: 4px; overscroll-behavior: contain;
+    max-height: 45vh; -webkit-mask-image: none; mask-image: none;
 }
-.jfyD-slide.is-open .jfyD-scrim { background: rgba(0,0,0,.72); transition: background var(--dur-slow, .35s) var(--ease-standard, ease); }
+.jfyD-slide.is-open .jfyD-desc-inner {
+    max-height: 45vh; overflow: auto; padding-right: 4px; overscroll-behavior: contain;
+}
+/* the darkening fades in and back out instead of switching */
+.jfyD-dim {
+    grid-column: 2; grid-row: 1; z-index: 1; pointer-events: none; border-radius: var(--radius-xl, 10px);
+    background: rgba(0,0,0,.62); opacity: 0;
+    transition: opacity var(--dur-slow, .35s) var(--ease-standard, ease);
+}
+.jfyD-slide.is-open .jfyD-dim { opacity: 1; }
+/* macros: the native preview's colours (renderCreatorNotesSecure), with a soft glow */
+.jfyD-desc .placeholder-user { color: #2ecc71; font-weight: 700; text-shadow: 0 0 8px rgba(46,204,113,.55); }
+.jfyD-desc .placeholder-char { color: #e74c3c; font-weight: 700; text-shadow: 0 0 8px rgba(231,76,60,.55); }
 .jfyD-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
 .jfyD-tags .jfy-tag { background: rgba(255,255,255,.14); color: #fff; padding: 2px 9px; border-radius: 999px; font-size: var(--font-xs, .75rem); }
 
@@ -78,7 +113,7 @@
     grid-column: 3; grid-row: 1; z-index: 2; align-self: end;
     display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 0 0 24px 12px;
 }
-.jfyD-rail button {
+.jfyD-rail button, .jfyD-rail a {
     all: unset; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;
     color: #fff; font-size: var(--font-xs, .75rem); font-weight: 600; text-shadow: var(--cl-text-halo, none);
 }
@@ -87,9 +122,11 @@
     border-radius: 50%; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.14);
     transition: background var(--dur-slow, .35s) var(--ease-standard, ease), transform .15s ease;
 }
-.jfyD-rail button:hover i { background: rgba(var(--accent-rgb, 74,158,255), .28); border-color: rgba(var(--accent-rgb, 74,158,255), .55); }
-.jfyD-rail button:active i { transform: scale(.92); }
-.jfyD-rail button:focus-visible i { outline: 2px solid var(--accent, #4a9eff); outline-offset: 2px; }
+.jfyD-rail a { text-decoration: none; }
+.jfyD-rail a i img { width: 22px; height: 22px; border-radius: 4px; display: block; }
+.jfyD-rail a:hover i, .jfyD-rail button:hover i { background: rgba(var(--accent-rgb, 74,158,255), .28); border-color: rgba(var(--accent-rgb, 74,158,255), .55); }
+.jfyD-rail button:active i, .jfyD-rail a:active i { transform: scale(.92); }
+.jfyD-rail a:focus-visible i, .jfyD-rail button:focus-visible i { outline: 2px solid var(--accent, #4a9eff); outline-offset: 2px; }
 .jfyD-rail button:first-child i { background: var(--accent, #4a9eff); border-color: transparent; }
 .jfyD-nsfw {
     grid-column: 2; grid-row: 1; justify-self: end; align-self: start; z-index: 2; margin: 12px;
@@ -101,11 +138,12 @@
 @media (max-width: 720px) {
     /* phone: the stage is the screen and the rail floats over it */
     .jfyD-slide { grid-template-columns: 1fr; }
-    .jfyD-portrait, .jfyD-scrim { grid-column: 1; border-radius: 0; box-shadow: none; }
+    .jfyD-stage, .jfyD-scrim, .jfyD-dim { grid-column: 1; border-radius: 0; box-shadow: none; }
     .jfyD-info { grid-column: 1; padding-right: 76px; padding-bottom: 76px; }
     .jfyD-rail { grid-column: 1; justify-self: end; padding: 0 10px 84px 0; }
     .jfyD-nsfw { grid-column: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-    .jfyD-rail i, .jfyD-slide.is-open .jfyD-scrim { transition: none; }
+    .jfyD-rail i, .jfyD-dim, .jfyD-desc, .jfyD-portrait { transition: none; }
+    .jfyD-stage::before { animation: none; }
 }

@@ -61,9 +61,15 @@ export function mountPrototype(el, ctx) {
     let cleanups = [];
     const seen = new Set();
 
+    // the native online preview's own path (renderCreatorNotesSecure): formatRichText(text, charName, true) answers
+    // {{user}} / {{char}} / pronouns as .placeholder-user / .placeholder-char spans; fallback: plain names
     const desc = (c) => {
-        let h = fillNameMacros(c.descriptionHtml, { user: esc(persona), char: esc(c.chatName) });
-        try { h = ctx.CoreAPI.answerPronounMacros?.(h, ctx.CoreAPI.getPersonaPronouns?.()) ?? h; } catch { /* raw */ }
+        let h = '';
+        try { h = ctx.CoreAPI.formatRichText?.(c.descriptionHtml, c.chatName, true) || ''; } catch { h = ''; }
+        if (!h) {
+            h = fillNameMacros(c.descriptionHtml, { user: esc(persona), char: esc(c.chatName) });
+            try { h = ctx.CoreAPI.answerPronounMacros?.(h, ctx.CoreAPI.getPersonaPronouns?.()) ?? h; } catch { /* raw */ }
+        }
         return ctx.CoreAPI.safePurify(h, {}) || esc(h);
     };
 
@@ -125,16 +131,21 @@ export function mountPrototype(el, ctx) {
     const slide = (c, i) => `
         <section class="jfyD-slide" data-i="${i}" aria-label="${esc(c.name)}">
             <div class="jfyD-backdrop" style="background-image:url('${esc(sized(c.avatar, 200))}')"></div>
-            <img class="jfyD-portrait" src="${esc(sized(c.avatar, 900))}" alt="" referrerpolicy="no-referrer" loading="${i < 2 ? 'eager' : 'lazy'}" decoding="async">
+            <div class="jfyD-stage">
+                <img class="jfyD-portrait" src="${esc(sized(c.avatar, 900))}" alt="" referrerpolicy="no-referrer" loading="${i < 3 ? 'eager' : 'lazy'}" decoding="async"
+                    onload="this.parentElement.classList.add('loaded')" onerror="this.parentElement.classList.add('loaded','failed')">
+            </div>
             <div class="jfyD-scrim"></div>
+            <div class="jfyD-dim"></div>
             <div class="jfyD-info">
                 <div class="jfyD-creator"><span class="jfyD-handle">@${esc(c.creatorName)}</span>${c.creatorVerified ? ' <i class="fa-solid fa-circle-check"></i>' : ''}<span class="jfyD-dot">·</span>${fmt(c.followers)} followers</div>
                 <h2 class="jfyD-name">${esc(c.name)}</h2>
-                <div class="jfyD-desc" data-act="expand">${desc(c)}</div>
+                <div class="jfyD-desc" data-act="expand"><div class="jfyD-desc-inner">${desc(c)}</div></div>
                 <div class="jfyD-tags">${tagsHtml(c, 6)}</div>
             </div>
             <nav class="jfyD-rail" aria-label="Actions">
                 <button type="button" data-act="noop" aria-label="Import"><i class="fa-solid fa-file-import"></i><span>Import</span></button>
+                <a class="jfyD-open" href="${esc(c.url)}" target="_blank" rel="noopener noreferrer" aria-label="Open on JanitorAI" title="Open on JanitorAI"><i><img src="https://ella.janitorai.com/favicon.ico" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'fa-solid fa-arrow-up-right-from-square'}))"></i><span>JanitorAI</span></a>
                 <button type="button" data-act="noop" aria-label="Favorites"><i class="fa-regular fa-heart"></i><span>${fmt(c.favorites)}</span></button>
                 <button type="button" data-act="noop" aria-label="Chats"><i class="fa-regular fa-comments"></i><span>${fmt(c.chats)}</span></button>
                 <button type="button" data-act="expand" aria-label="Details"><i class="fa-solid fa-coins"></i><span>${fmt(c.tokens)}</span></button>
@@ -148,14 +159,24 @@ export function mountPrototype(el, ctx) {
     function wireD() {
         const feedEl = root.querySelector('.jfyD');
         if (!feedEl) return;
-        const fit = () => { const top = feedEl.getBoundingClientRect().top; feedEl.style.height = `${Math.max(360, window.innerHeight - top)}px`; };
-        fit();
-        window.addEventListener('resize', fit);
-        cleanups.push(() => window.removeEventListener('resize', fit));
+        // fill the whole view (over its padding), so no app background shows around the feed
+        const host = feedEl.closest('.gallery-content');
+        root.classList.toggle('jfy-fill', !!host);
+        if (host) host.scrollTop = 0;
+        else {
+            const fit = () => { const top = feedEl.getBoundingClientRect().top; feedEl.style.height = `${Math.max(360, window.innerHeight - top)}px`; };
+            fit();
+            window.addEventListener('resize', fit);
+            cleanups.push(() => window.removeEventListener('resize', fit));
+        }
         observer = new IntersectionObserver((entries) => {
             for (const en of entries) {
                 if (!en.isIntersecting) continue;
                 selected = Number(en.target.dataset.i);
+                for (let k = 1; k <= 3; k++) {
+                    const img = feedEl.querySelector(`.jfyD-slide[data-i="${selected + k}"] .jfyD-portrait`);
+                    if (img && img.loading !== 'eager') img.loading = 'eager';
+                }
                 if (cards.length - selected <= 3) loadMore();
             }
         }, { root: feedEl, threshold: 0.6 });
@@ -186,6 +207,7 @@ export function mountPrototype(el, ctx) {
         const meta = VARIANTS.find(x => x.key === v);
         const body = !cards.length ? '<p class="jfy-message">Loading…</p>' : v === 'B' ? variantB() : v === 'D' ? variantD() : variantA();
         root.classList.toggle('is-d', v === 'D');
+        if (v !== 'D') root.classList.remove('jfy-fill');
         root.innerHTML = `<div class="jfy-proto-source">PROTOTYPE · data: ${esc(source)}${persona ? ` · {{user}} = ${esc(persona)}` : ''}</div>${body}
             <div class="jfy-proto-switch" role="toolbar">
                 <button type="button" data-sw="-1" aria-label="Previous variant">‹</button>

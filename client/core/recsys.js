@@ -76,6 +76,7 @@ export const characterUrl = (id, name) => `${SITE}/characters/${id}_character-${
 export function normalizeCard(item) {
     const c = item?.character;
     if (!c || !isUuid(c.id) || c.is_deleted || c.is_force_remove || c.is_public === false) return null;
+    const creatorAvatar = typeof item.creator_profile?.avatar === 'string' ? item.creator_profile.avatar : '';
     return {
         id: c.id,
         name: String(c.name || 'Unnamed'),
@@ -84,6 +85,9 @@ export function normalizeCard(item) {
         descriptionHtml: String(c.description || ''),
         creatorId: String(c.creator_id || ''),
         creatorName: String(c.creator_name || ''),
+        creatorAvatar: !creatorAvatar || /^[a-z][a-z0-9+.-]*:/i.test(creatorAvatar) && !/^https:\/\//i.test(creatorAvatar) ? ''
+            : /^https:\/\//i.test(creatorAvatar) ? creatorAvatar
+            : `https://ella.janitorai.com/avatars/${encodeURIComponent(creatorAvatar)}?width=100`, // non-https absolute: dropped
         creatorVerified: !!c.creator_verified,
         followers: Number(item.creator_profile?.followers_count) || 0,
         tags: (Array.isArray(c.tags) ? c.tags : []).map(t => String(t?.name || '')).filter(Boolean),
@@ -119,6 +123,18 @@ export function passesFilters(card, { showNsfw = false, minTokens = 0 } = {}) {
     if (card.nsfw && showNsfw !== true) return false;
     if (minTokens > 0 && card.tokens < minTokens) return false;
     return true;
+}
+
+/** Shared backdrop: even slides stay on layer 0, odd slides on layer 1. */
+export function backdropPlan(scrollTop, height, count) {
+    const pos = Math.max(0, Number(scrollTop) || 0) / (height > 0 ? height : 1);
+    const a = Math.min(Math.floor(pos), Math.max(0, count - 1));
+    const frac = count ? Math.min(1, pos - a) : 0;
+    const front = 1 - a % 2;
+    const slides = [null, null];
+    if (count) slides[a % 2] = a;
+    if (a + 1 < count) slides[front] = a + 1;
+    return { a, frac, front, slides };
 }
 
 let counter = 0;

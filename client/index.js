@@ -18,7 +18,7 @@ export default {
             id: 'foryou',
             label: 'For You',
             icon: 'fa-wand-magic-sparkles',
-            render(el) { view = mountView(el, ctx); },
+            render(el) { view?.dispose(); view = mountView(el, ctx); },
             enter: () => view?.enter(),
             leave: () => view?.leave(),
             refresh: () => view?.refresh(),
@@ -29,16 +29,25 @@ export default {
             body.innerHTML = '';
             body.appendChild(root);
             const on = (k) => ctx.settings.get(k) === true;
+            const esc = value => ctx.CoreAPI.escapeHtml(String(value ?? ''));
+            const layout = ctx.settings.get('layout') === 'grid' ? 'grid' : 'swipe';
             root.innerHTML = `
                 <label class="jfy-setting"><input type="checkbox" class="cl-switch-input" data-k="sendSignals" ${on('sendSignals') ? 'checked' : ''}><span class="cl-switch"></span>
                     Teach the feed (send views, skips and "not interested" to JanitorAI, as the site does)</label>
                 <label class="jfy-setting"><input type="checkbox" class="cl-switch-input" data-k="showNsfw" ${on('showNsfw') ? 'checked' : ''}><span class="cl-switch"></span>
                     Show NSFW characters</label>
-                <label class="jfy-setting">Hide characters under <input type="number" min="0" step="50" class="glass-input jfy-num" data-k="minTokens" value="${Number(ctx.settings.get('minTokens')) || 0}"> tokens</label>`;
+                <label class="jfy-setting">Hide characters under <input type="number" min="0" step="50" class="glass-input jfy-num" data-k="minTokens" value="${esc(Number(ctx.settings.get('minTokens') ?? 100) || 0)}"> tokens</label>
+                <label class="jfy-setting">Layout <select class="glass-select" data-k="layout">
+                    <option value="swipe" ${layout === 'swipe' ? 'selected' : ''}>Swipe feed</option>
+                    <option value="grid" ${layout === 'grid' ? 'selected' : ''}>Grid</option>
+                </select></label>`;
+            ctx.CoreAPI.initCustomSelect?.(root.querySelector('select'));
             root.addEventListener('change', (ev) => {
                 const k = ev.target.dataset.k;
                 if (!k) return;
-                ctx.settings.set(k, ev.target.type === 'checkbox' ? ev.target.checked : Math.max(0, Number(ev.target.value) || 0));
+                ctx.settings.set(k, k === 'layout' ? (ev.target.value === 'grid' ? 'grid' : 'swipe')
+                    : ev.target.type === 'checkbox' ? ev.target.checked : Math.max(0, Number(ev.target.value) || 0));
+                view?.refresh();
             });
         });
     },

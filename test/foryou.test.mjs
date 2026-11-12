@@ -7,6 +7,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { fillNameMacros, CARD_BATCH, homePath, cardsPath, parseSlate, normalizeCard, passesFilters, makeEvent, cardEventPayloads, avatarUrl, characterUrl } from '../client/core/recsys.js';
 import { stopgapJanitorToken, decodeExpiry } from '../client/core/session.js';
 import { createFeed } from '../client/core/feed.js';
+import * as swipe from '../client/core/recsys.js';
+import * as preview from '../client/core/preview.js';
 import { register } from '../server/index.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -54,12 +56,30 @@ test('card: normalizes the live cards shape', () => {
     assert.equal(normalizeCard(null), null);
 });
 
+test('creator avatar uses the profile avatar path, preserves HTTPS, and is absent when missing', () => {
+    const item = fx.cards.items[0];
+    assert.equal(normalizeCard(item).creatorAvatar, `https://ella.janitorai.com/avatars/${encodeURIComponent(item.creator_profile.avatar)}?width=100`);
+    assert.equal(normalizeCard({ ...item, creator_profile: { avatar: 'https://example.com/avatar.webp?width=200' } }).creatorAvatar, 'https://example.com/avatar.webp?width=200');
+    assert.equal(normalizeCard({ ...item, creator_profile: { avatar: 'a b.webp' } }).creatorAvatar, 'https://ella.janitorai.com/avatars/a%20b.webp?width=100');
+    assert.equal(normalizeCard({ ...item, creator_profile: {} }).creatorAvatar, '');
+    assert.equal(normalizeCard({ ...item, creator_profile: undefined }).creatorAvatar, '');
+});
+
 test('filters: NSFW off unless explicitly true; token floor', () => {
     const c = normalizeCard(fx.cards.items[0]);
     assert.equal(passesFilters(c, {}), false);
     assert.equal(passesFilters(c, { showNsfw: 'true' }), false, 'only boolean true opts in');
     assert.equal(passesFilters(c, { showNsfw: true }), true);
     assert.equal(passesFilters(c, { showNsfw: true, minTokens: 5000 }), false);
+});
+
+test('creator avatar: an http:// or other-scheme value is dropped, not mangled', () => {
+    const base = fx.cards.items[0];
+    const withAvatar = (a) => normalizeCard({ ...base, creator_profile: { ...base.creator_profile, avatar: a } }).creatorAvatar;
+    assert.equal(withAvatar('http://evil.example/x.png'), '');
+    assert.equal(withAvatar('javascript:alert(1)'), '');
+    assert.equal(withAvatar('https://ella.janitorai.com/avatars/a.webp'), 'https://ella.janitorai.com/avatars/a.webp');
+    assert.match(withAvatar('a b.webp'), /^https:\/\/ella\.janitorai\.com\/avatars\/a%20b\.webp\?width=100$/);
 });
 
 test('urls', () => {
@@ -171,6 +191,73 @@ test('feed: with signals on it sends the site\'s events and feedback', async () 
     for (const n of ['feed.character.shown', 'feed.character.dwell.ended', 'feed.character.skipped', 'feed.character.not_interested', 'feed.session.ended']) assert.ok(names.includes(n), n);
     assert.deepEqual(api.calls.feedback, [[id(2), 'imp2']]);
     assert.equal(new Set(api.calls.events.map(e => e.session_id)).size, 1);
+});
+
+test('backdrop plan ping-pongs even and odd images and clamps the end', () => {
+    assert.deepEqual(swipe.backdropPlan(150, 100, 5), { a: 1, frac: .5, front: 0, slides: [2, 1] });
+    assert.deepEqual(swipe.backdropPlan(200, 100, 5), { a: 2, frac: 0, front: 1, slides: [2, 3] });
+    assert.deepEqual(swipe.backdropPlan(-10, 100, 5), { a: 0, frac: 0, front: 1, slides: [0, 1] });
+    assert.deepEqual(swipe.backdropPlan(900, 100, 5), { a: 4, frac: 1, front: 1, slides: [4, null] });
+    assert.deepEqual(swipe.backdropPlan(0, 0, 0), { a: 0, frac: 0, front: 1, slides: [null, null] });
+});
+
+for (const signals of [false, true]) test(`swipe goTo bookkeeping, signals=${signals}`, async () => {
+    let t = 0;
+    const api = fakeApi({ pages: 1, perPage: 9, nsfwEvery: 2 });
+    const requests = [];
+    const cards = api.cards;
+    api.cards = ids => { requests.push(ids); return cards(ids); };
+    const feed = createFeed(api, { sendSignals: () => signals, now: () => t, filters: () => ({ minTokens: 100 }) });
+    await feed.start();
+    await feed.loadMore(6);
+    assert.deepEqual(feed.cards().map(c => c.id), [id(1), id(3), id(5), id(7), id(9)]);
+    assert.ok(requests.length >= 3);
+    assert.ok(requests.every(ids => ids.length <= 3));
+    t = 1200;
+    await feed.goTo(3);
+    assert.equal(feed.current().id, id(7));
+    await feed.goTo(3); // observer reporting the same slide is not another impression
+    feed.markEngaged();
+    t = 3500;
+    await feed.goTo(1);
+    await feed.end();
+    const events = api.calls.events;
+    if (!signals) assert.deepEqual(events, []);
+    else {
+        assert.deepEqual(events.filter(e => e.name === 'feed.character.shown').map(e => e.payload.character_id), [id(1), id(7), id(3)]);
+        assert.deepEqual(events.filter(e => e.name === 'feed.character.skipped').map(e => e.payload.character_id), [id(1), id(3)]);
+        assert.equal(events.find(e => e.name === 'feed.character.dwell.ended').payload.dwell_ms, 1200);
+        assert.equal(events.find(e => e.name === 'feed.session.ended').payload.cards_shown, 3);
+    }
+});
+
+test('preview readiness fails safely for absent, throwing and stalled registry internals', async () => {
+    const p = { id: 'janitorai', browseView: { _initialized: false } };
+    const document = { getElementById: () => ({ classList: { contains: () => true } }) };
+    for (const activateProvider of [undefined, () => { throw Error('cold'); }, () => new Promise(() => {})]) {
+        const window = { ProviderRegistry: { activateProvider, deactivateCurrentProvider() {}, getActiveProviderId: () => 'janitorai' } };
+        const result = await preview.stopgapReadyProviderPreview(p, { window, document, timeoutMs: 5 });
+        assert.equal(result.ok, false);
+        assert.match(result.reason, /Online/);
+    }
+    let parked = 0;
+    const window = { ProviderRegistry: {
+        activateProvider: async () => { p.browseView._initialized = true; },
+        getActiveProviderId: () => p.id,
+        deactivateCurrentProvider: () => { parked++; },
+    } };
+    assert.deepEqual(await preview.stopgapReadyProviderPreview(p, { window, document }), { ok: true });
+    assert.equal(parked, 1);
+});
+
+test('turning Teach off discards queued signals before leave flushes', async () => {
+    let enabled = true;
+    const api = fakeApi();
+    const feed = createFeed(api, { sendSignals: () => enabled });
+    await feed.start();
+    enabled = false;
+    await feed.end();
+    assert.deepEqual(api.calls.events, []);
 });
 
 // ---------- server ----------

@@ -1,7 +1,7 @@
 {
     "id": "janitor-foryou",
     "name": "Janitor For You",
-    "version": "0.0.1",
+    "version": "0.1.0",
     "author": "DJLegends",
     "description": "Browse your personalized JanitorAI \"For you\" feed (the site's Discover recommendations) inside Sigma, using the JanitorAI session Sigma already holds. Optionally sends the same view/skip signals the site does so the feed keeps learning.",
     "requires": { "api": "2.7" },
@@ -11,7 +11,8 @@
     "settings": {
         "sendSignals": false,
         "showNsfw": false,
-        "minTokens": 100
+        "minTokens": 100,
+        "layout": "swipe"
     },
     "contributes": ["app.action", "shell.view"]
 }

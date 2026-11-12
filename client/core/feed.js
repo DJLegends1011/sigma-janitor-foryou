@@ -32,6 +32,7 @@ export function createFeed(api, { filters = () => ({}), sendSignals = () => fals
     }
 
     async function flush() {
+        if (!sendSignals()) { queue = []; return; }
         if (!queue.length) return;
         const batch = queue.splice(0, 50);
         try { await api.events(batch); } catch { /* telemetry is best effort */ }
@@ -101,12 +102,13 @@ export function createFeed(api, { filters = () => ({}), sendSignals = () => fals
     async function show(i) {
         const vis = visible();
         if (i < 0 || i >= vis.length) return null;
+        if (active?.entry.id === vis[i].entry.id) return active.card;
         await leave();
         index = i;
         const v = vis[i];
         active = { at: now(), entry: v.entry, slate: v.slate, card: v.card, engaged: false };
-        if (session) session.shown += 1;
         await emit('feed.character.shown', cardEventPayloads(v.entry, v.slate, v.card.creatorId, 0).shown);
+        if (session) session.shown += 1;
         return v.card;
     }
 
@@ -114,8 +116,11 @@ export function createFeed(api, { filters = () => ({}), sendSignals = () => fals
         async start() { await fill(2); return show(0); },
         async next() { await fill(2); return show(index + 1); },
         async prev() { return show(index - 1); },
+        goTo: (i) => show(i),
+        cards: () => visible().map(v => v.card),
+        loadMore: (ahead = 5) => fill(ahead),
         current: () => active?.card || null,
-        position: () => ({ index, loaded: visible().length, hasMore, personalizing, hidden: { ...hidden }, scanned: entries.filter(e => e.hydrated).length }),
+        position: () => ({ index, loaded: visible().length, hasMore: hasMore || entries.some(e => !e.hydrated), personalizing, hidden: { ...hidden }, scanned: entries.filter(e => e.hydrated).length }),
         markEngaged() { if (active) active.engaged = true; },
         async notInterested() {
             if (!active) return null;
@@ -127,7 +132,7 @@ export function createFeed(api, { filters = () => ({}), sendSignals = () => fals
             }
             const e = entries.find(x => x.entry.id === entry.id);
             if (e) e.filtered = true;
-            active = null;
+            await leave();
             await fill(2);
             return show(Math.min(index, visible().length - 1));
         },

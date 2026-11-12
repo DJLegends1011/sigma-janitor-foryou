@@ -34,6 +34,8 @@
     position: absolute; inset: -60px;
     background-size: cover; background-position: center 20%;
     filter: blur(40px) saturate(1.1) brightness(.45);
+    /* own compositor layer each, so an opacity change never re-runs the blur */
+    will-change: opacity; transform: translateZ(0); backface-visibility: hidden;
 }
 .jfyD-bg-layer + .jfyD-bg-layer { opacity: 0; }
 .jfyD {

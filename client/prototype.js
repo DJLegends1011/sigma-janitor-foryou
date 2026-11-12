@@ -186,16 +186,22 @@ export function mountPrototype(el, ctx) {
             im.decoding = 'async';
             im.src = u;
         };
-        let shownA = -1, shownB = -1, raf = 0;
+        // ping-pong: even slides always live on layer 0, odd on layer 1. The layer you're looking at never
+        // changes its picture; only the hidden one (opacity 0) is re-pointed, so the blur never re-rasters on screen
+        const shown = [null, null];
+        let raf = 0;
+        const setImg = (L, i) => { const v = bgOf(i); if (shown[L] !== v) { layers[L].style.backgroundImage = v; shown[L] = v; } };
         const paintBg = () => {
             raf = 0;
             const h = feedEl.clientHeight || 1;
             const pos = Math.max(0, feedEl.scrollTop / h);
-            const a = Math.min(Math.floor(pos), cards.length - 1);
-            const frac = Math.min(1, pos - a);
-            if (a !== shownA) { layers[0].style.backgroundImage = bgOf(a); shownA = a; }
-            if (a + 1 !== shownB) { layers[1].style.backgroundImage = bgOf(a + 1); shownB = a + 1; }
-            layers[1].style.opacity = String(frac);
+            const a = Math.min(Math.floor(pos), Math.max(0, cards.length - 1));
+            const frac = Math.min(1, Math.max(0, pos - a));
+            const La = a % 2, Lb = 1 - La;
+            setImg(La, a);
+            layers[La].style.opacity = '1'; layers[La].style.zIndex = '0';
+            layers[Lb].style.zIndex = '1'; layers[Lb].style.opacity = String(frac);
+            setImg(Lb, a + 1); // hidden at frac 0, so swapping it is invisible
         };
         const onScroll = () => { if (!raf) raf = requestAnimationFrame(paintBg); };
         feedEl.addEventListener('scroll', onScroll, { passive: true });

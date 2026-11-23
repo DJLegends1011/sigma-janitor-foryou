@@ -1,10 +1,38 @@
 # Janitor For You (Project Σ extension)
 
+<p align="center">
+  <img src="docs/images/mobile-swipe.gif" alt="Swiping through the For You feed on a phone: opening a card's description, then swiping to the next cards" width="280">
+  &nbsp;&nbsp;
+  <img src="docs/images/desktop.png" alt="The For You swipe feed on desktop, with the action rail beside the card" width="520">
+</p>
+
 > **Status: 0.1.0 work-in-progress.** Swipe feed and optional native Grid layout; import opens Sigma's own JanitorAI preview.
 
 JanitorAI's personalized **For you** feed (`janitorai.com/?segment=discover`, `/foru/<id>`) inside Sigma: one recommended
 character per full-height swipe slide, with ↑/↓ or j/k navigation, automatically loaded recommendations,
 expandable creator descriptions, creator profile pictures, and Import / Open / Pass actions. Choose **Grid** in settings for Sigma's native browse cards; clicking a card opens the same preview. NSFW stays opt-in in both layouts.
+
+## Screenshots
+| | Desktop | Mobile |
+|---|---|---|
+| **Feed** | <img src="docs/images/desktop.png" alt="Desktop feed" width="460"> | <img src="docs/images/mobile.png" alt="Mobile feed" width="200"> |
+| **Description open** | <img src="docs/images/desktop-expanded.png" alt="Desktop feed with the creator's description expanded" width="460"> | <img src="docs/images/mobile-expanded.png" alt="Mobile feed with the creator's description expanded" width="200"> |
+
+<sub>Captured with Show NSFW off. Card art and descriptions belong to their JanitorAI creators. A higher-quality clip of the GIF is in [`docs/images/mobile-swipe.mp4`](docs/images/mobile-swipe.mp4).</sub>
+
+## Controls
+The rail beside each card, top to bottom:
+
+| Button | What it does |
+|---|---|
+| **Import** | Opens the card in Sigma's own JanitorAI preview (Online), where you can import it |
+| **Open** | Opens the character's page on JanitorAI in a new tab |
+| ♡ **Favorites** | How many people favorited the card on JanitorAI (display only; favorite sync isn't built yet) |
+| 💬 **Chats** | How many chats people have started with the card |
+| 🪙 **Tokens** | The card's token count; tapping it opens or closes the description |
+| **Pass** | Skips the card ("Not interested"); with **Teach the feed** on, JanitorAI is told too |
+
+Tap the description to expand it. Scroll or swipe, ↑/↓ or j/k to move between cards.
 
 ## Requirements
 - Project Σ with extension API **2.7** (Hosted Browser consumer door).
@@ -59,4 +87,4 @@ The active Sigma persona name/pronouns are read locally to answer description ma
 The equivalent direct suite command is `node --test test/*.test.mjs`.
 
 ## License
-MIT © DJLegends
+GPL-3.0 © DJLegends. See [`LICENSE`](LICENSE).
